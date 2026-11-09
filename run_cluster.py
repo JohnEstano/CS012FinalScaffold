@@ -4,50 +4,54 @@ import os
 
 def main():
     print("==================================================")
-    print(" Starting Simulated Cloud Distributed Cluster...")
+    print(" Starting MENDO Distributed Cloud Simulation...")
     print("==================================================")
-    
+
     processes = []
-    
+
     # Define your worker nodes here
-    # This is an example (simulating 3 workers, 2 public workers and 1 private worker)
+    # The 3 MENDO machines. Each one gets its own port and API key.
     workers = [
-        {"id": "Worker-1-Private", "port": "8001", "is_private": "true"},
-        {"id": "Worker-2-Public", "port": "8002", "is_private": "false"},
-        {"id": "Worker-3-Public", "port": "8003", "is_private": "false"},
+        {"id": "MENDO-01", "port": "8101", "is_private": "false", "key": "key-mendo-01"},
+        {"id": "MENDO-02", "port": "8102", "is_private": "false", "key": "key-mendo-02"},
+        {"id": "MENDO-03", "port": "8103", "is_private": "false", "key": "key-mendo-03"},
     ]
-    
+
     for w in workers:
         print(f"[Cluster Manager] Starting {w['id']} on http://localhost:{w['port']}")
         cmd = [
             sys.executable, "-m", "uvicorn", "node.main:app",
-            "--host", "0.0.0.0",
+            "--host", "127.0.0.1",
             "--port", w["port"],
             "--log-level", "warning"
         ]
         env = {
             "NODE_ID": w["id"],
             "PORT": w["port"],
-            "IS_PRIVATE": w["is_private"]
+            "IS_PRIVATE": w["is_private"],
+            "API_KEY": w["key"],
+            "CLOUD_URL": "http://127.0.0.1:8000",
         }
         p = subprocess.Popen(cmd, env={**os.environ, **env})
         processes.append(p)
 
-    # Central Coordinator Node
-    print("[Cluster Manager] Starting Central Coordinator Gateway on http://localhost:8000")
+    # MENDO Cloud
+    print("[Cluster Manager] Starting MENDO Cloud on http://localhost:8000")
     coord_cmd = [
         sys.executable, "-m", "uvicorn", "coordinator.main:app",
-        "--host", "0.0.0.0",
+        "--host", "127.0.0.1",
         "--port", "8000",
-        "--log-level", "info"
+        "--log-level", "warning"
     ]
     coord_env = {
-        "WORKERS": "http://localhost:8001,http://localhost:8002,http://localhost:8003"
+        "WORKERS": ",".join(f"http://127.0.0.1:{w['port']}" for w in workers),
+        "MACHINE_KEYS": ",".join(f"{w['id']}={w['key']}" for w in workers),
+        "ADMIN_KEY": "admin-demo",
     }
     p_coord = subprocess.Popen(coord_cmd, env={**os.environ, **coord_env})
     processes.append(p_coord)
 
-    print("\n[Cluster Online] Master Gateway: http://localhost:8000")
+    print("\n[Cluster Online] Open http://localhost:8000")
     print("Interactive Swagger Docs: http://localhost:8000/docs")
     print("Press Ctrl+C to stop all cluster processes.\n")
 

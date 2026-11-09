@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MENDO Cloud Simulation</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 "Segoe UI", system-ui, sans-serif; background: #eef2f5; color: #1d2733; }
+  header { background: #12324a; color: #fff; padding: 10px 20px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 17px; margin: 0; flex: 1; }
+  main { max-width: 1250px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+  .box { background: #fff; border: 1px solid #dde3e9; border-radius: 10px; padding: 14px; }
+  h2 { font-size: 15px; margin: 0 0 10px; }
+  button { font: inherit; padding: 6px 12px; border: 1px solid #c8d1da; background: #fff; border-radius: 6px; cursor: pointer; }
+  button:hover { background: #eef2f5; }
+  button.on { background: #c0392b; color: #fff; border-color: #c0392b; }
+  #startBtn { background: #27ae60; color: #fff; border: 0; padding: 8px 18px; font-weight: 600; }
+  #startBtn.running { background: #c0392b; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input { font: inherit; padding: 6px 8px; border: 1px solid #c8d1da; border-radius: 6px; }
+  .muted { color: #66727f; }
+  .pill { font-size: 12px; padding: 2px 8px; border-radius: 10px; color: #fff; }
+  .green { background: #27ae60; } .red { background: #c0392b; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { text-align: left; padding: 5px 8px; border-bottom: 1px solid #eef1f4; }
+  th { font-size: 12px; color: #66727f; font-weight: 600; }
+  .low { color: #c0392b; font-weight: 600; }
+
+  /* 3D world */
+  #worldBox { padding: 0; overflow: hidden; }
+  #world { position: relative; height: 520px; }
+  #world canvas { display: block; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: rgba(255,255,255,.92); border-radius: 6px;
+         padding: 3px 8px; font-size: 12px; text-align: center; pointer-events: none; white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  .tag .ok { color: #1e8449; } .tag .bad { color: #c0392b; font-weight: 600; }
+  .hint { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: #33475b; background: rgba(255,255,255,.7); padding: 2px 8px; border-radius: 6px; }
+
+  /* vending machine panels */
+  .machines { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .vm { background: #0f6e64; border-radius: 12px 12px 6px 6px; padding: 10px; box-shadow: 0 4px 0 #0a4f48; }
+  .vm-top { display: flex; justify-content: space-between; align-items: center; color: #fff; font-weight: 700; margin-bottom: 8px; }
+  .led { width: 11px; height: 11px; border-radius: 50%; background: #2ecc71; display: inline-block; box-shadow: 0 0 6px #2ecc71; }
+  .led.off { background: #e74c3c; box-shadow: 0 0 6px #e74c3c; }
+  .net { font-size: 11px; font-weight: 400; }
+  .screen { background: #0b1d2a; color: #7fffd4; font: 12.5px/1.4 Consolas, monospace; height: 92px; border-radius: 6px;
+            padding: 7px 8px; overflow: hidden; border: 3px solid #08313a; white-space: pre-wrap; }
+  .screen .you { color: #fff; }
+  .glass { background: #e8f3f9; border-radius: 6px; margin-top: 8px; padding: 6px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+  .slot { background: #fff; border-radius: 4px; padding: 3px 2px; text-align: center; font-size: 9.5px; line-height: 1.2; border: 2px solid transparent; }
+  .slot .box { height: 14px; margin: 0 auto 2px; width: 70%; border-radius: 2px; }
+  .slot .q { font-weight: 700; font-size: 11px; }
+  .slot.low .q { color: #c0392b; }
+  .slot.empty { opacity: .45; }
+  .slot.vend { border-color: #f1c40f; background: #fff9db; }
+  .vm-info { color: #d6efe9; font-size: 11.5px; margin-top: 6px; }
+  .under { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .under input { flex: 1; min-width: 120px; font-size: 12.5px; }
+  .under button { font-size: 12.5px; padding: 4px 9px; }
+
+  #logs { font-family: Consolas, monospace; font-size: 12.5px; max-height: 300px; overflow-y: auto; }
+  #logs div { padding: 2px 0; border-bottom: 1px solid #f1f3f5; }
+  #logs .WARN { color: #b03a2e; }
+  pre { background: #0b1d2a; color: #cfe1f1; padding: 10px; border-radius: 6px; font-size: 12px; max-height: 220px; overflow: auto; margin: 8px 0 0; }
+  .two { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+  .three { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 16px; }
+  .alert { color: #b03a2e; padding: 3px 0; border-bottom: 1px solid #f6e0dd; }
+  .bar { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 3px 0; }
+  .bar span:first-child { width: 95px; }
+  .bar i { display: block; height: 10px; background: #3a7ca5; border-radius: 3px; }
+
+  /* concept buttons */
+  .concepts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 10px 14px; }
+  .concepts button { background: #eaf2f8; border-color: #b9cde0; color: #12324a; font-weight: 600; }
+  .concepts button:hover { background: #d6e6f2; }
+  .klog { background: #0b1d2a; color: #b8c7d3; font: 11.5px/1.45 Consolas, monospace; height: 170px; overflow-y: auto;
+          border-radius: 6px; padding: 6px 8px; margin-top: 8px; }
+  .klog .out { color: #7fb8ff; } .klog .in { color: #7fffd4; } .klog .WARN { color: #ff8a80; } .klog .ev { color: #f5e6a8; }
+  .docs { color: #bfe9e0; font-size: 11.5px; font-weight: 400; text-decoration: underline; }
+  /* info buttons */
+  .info { width: 21px; height: 21px; border-radius: 50%; border: 0; padding: 0; background: #2f6fa3; color: #fff;
+          font: 700 12px/21px "Segoe UI", sans-serif; cursor: pointer; vertical-align: middle; margin-left: 4px; }
+  .info:hover { background: #1d4f7a; }
+  .hl { outline: 3px solid #f1c40f !important; outline-offset: 3px; animation: blink .6s 5; }
+  @keyframes blink { 50% { outline-color: transparent; } }
+  #bubble { position: fixed; z-index: 50; max-width: 320px; background: #12324a; color: #fff; padding: 10px 12px;
+            border-radius: 8px; font-size: 13px; line-height: 1.45; box-shadow: 0 6px 20px rgba(0,0,0,.25); display: none; }
+  #bubble b { display: block; margin-bottom: 4px; color: #f1c40f; }
+  @media (max-width: 1000px) { .machines, .two, .three { grid-template-columns: 1fr; } }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<header>
+  <h1>MENDO Cloud Simulation: 1 cloud, 3 MENDO vending machines</h1>
+  <span id="served">0 customers served</span>
+  <button id="startBtn" onclick="toggleSimulation()">▶ Start simulation</button>
+</header>
+<main>
+
+  <div class="box concepts">
+    <b>Explain:</b>
+    <button data-concept="star">Star topology</button>
+    <button data-concept="cap">CAP theorem</button>
+    <button data-concept="replication">Replication</button>
+    <button data-concept="deployment">Hybrid private cloud</button>
+    <button data-concept="observability">Observability</button>
+    <button data-concept="resilience">Resilience tests</button>
+    <button data-concept="parallelism">Parallelism</button>
+  </div>
+
+  <div class="box" id="worldBox">
+    <div id="world"><div class="hint">drag to rotate · scroll to zoom</div></div>
+  </div>
+
+  <div class="machines" id="machines"></div>
+
+  <div class="two">
+    <div class="box">
+      <h2>Cloud dashboard (admin)</h2>
+      <div class="row" id="faultRow">
+        <button id="downBtn" onclick="toggleCloudDown()">Cloud down</button>
+        <button id="failBtn" onclick="toggleSyncFails()">Sync failure</button>
+        <button onclick="admin('/api/backup')">Backup</button>
+        <button onclick="admin('/api/restore')">Restore backup</button>
+        <button onclick="checkRecords()">Check records</button>
+      </div>
+      <p id="cloudMsg" class="muted"></p>
+      <table id="cloudTable"></table>
+    </div>
+
+    <div class="box">
+      <h2>Scaffold APIs</h2>
+      <div class="row">
+        <button onclick="api('GET', '/cluster/health')">GET /cluster/health</button>
+        <button onclick="computeParallel()">POST /compute-parallel ×3</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <input id="kvKey" placeholder="key" style="width:90px">
+        <input id="kvVal" placeholder="value" style="width:140px">
+        <label><input type="checkbox" id="kvSens"> sensitive</label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button onclick="api('POST', '/api/v1/write', { key: kvKey.value, value: kvVal.value, is_sensitive: kvSens.checked })">POST /api/v1/write</button>
+        <button onclick="api('GET', '/api/v1/read/' + encodeURIComponent(kvKey.value))">GET /api/v1/read/{key}</button>
+      </div>
+      <p class="muted" style="margin:8px 0 0"><a href="/docs" target="_blank">Cloud API docs (Swagger)</a></p>
+      <pre id="apiOut">Click an API to call it.</pre>
+    </div>
+  </div>
+
+  <div class="three">
+    <div class="box"><h2>Alerts</h2><div id="alerts" class="muted">No alerts.</div></div>
+    <div class="box"><h2>Analytics</h2><div id="analytics" class="muted">No data yet.</div></div>
+    <div class="box"><h2>Performance metrics</h2><div id="metrics" class="muted">No data yet.</div></div>
+  </div>
+
+  <div class="box">
+    <h2>Event logs (all 4 nodes)</h2>
+    <div id="logs"></div>
+  </div>
+</main>
+<div id="bubble"></div>
+
+<script type="module" src="/world.js"></script>
+<script>
+const ADMIN_KEY = "admin-demo";
+const MACHINES = [
+  { id: "MENDO-01", url: "http://127.0.0.1:8101", place: "Campus Clinic" },
+  { id: "MENDO-02", url: "http://127.0.0.1:8102", place: "Barangay Health Center" },
+  { id: "MENDO-03", url: "http://127.0.0.1:8103", place: "Transport Terminal" },
+];
+const COLORS = ["#e74c3c", "#e67e22", "#9b59b6", "#16a085", "#2980b9", "#8e44ad", "#27ae60", "#d35400", "#2c3e50", "#c0392b"];
+const PHRASES = [
+  "masakit ulo ko", "may lagnat ako", "gihilanat ko ug labad ulo", "nagtatae ako since kahapon",
+  "ubo nga naay plema", "dry cough po", "sipon at lagnat", "barado ilong ko", "allergy, bahing ng bahing",
+  "masakit ang katawan ko", "hyperacidity", "humihilab tiyan ko", "I have a headache", "may pantal ako",
+  "chest pain at hirap huminga", "nahihilo lang ako",
+];
+let cloudDown = false, syncFails = false, running = false, served = 0;
+const state = {}, busy = {};
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const rand = (a, b) => a + Math.floor(Math.random() * (b - a));
+const ago = t => t ? Math.round(Date.now() / 1000 - t) + "s ago" : "never";
+const world = () => window.World;   // the 3D scene (loads a moment after the page)
+
+async function call(url, method = "GET", body) {
+  const r = await fetch(url, { method, headers: { "Content-Type": "application/json", "X-Admin-Key": ADMIN_KEY },
+    body: body ? JSON.stringify(body) : undefined });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(data.detail || r.status), { data, status: r.status });
+  return data;
+}
+
+/* ---------------- vending machine panels ---------------- */
+document.getElementById("machines").innerHTML = MACHINES.map(m => `
+  <div>
+    <div class="vm" id="vm-${m.id}">
+      <div class="vm-top"><span>${m.id} · ${m.place} <a class="docs" href="${m.url}/docs" target="_blank">API docs</a></span><span class="net"><span class="led" id="led-${m.id}"></span> <span id="net-${m.id}">online</span></span></div>
+      <div class="screen" id="screen-${m.id}">Touch the screen to start.</div>
+      <div class="glass" id="glass-${m.id}"></div>
+      <div class="vm-info" id="info-${m.id}"></div>
+    </div>
+    <div class="under">
+      <input id="text-${m.id}" placeholder="type as a customer…">
+      <button onclick="serveCustomer('${m.id}', document.getElementById('text-${m.id}').value)">Send</button>
+      <button id="netBtn-${m.id}" onclick="toggleNet('${m.id}')">Internet off</button>
+      <button onclick="restock('${m.id}')">Restock</button>
+    </div>
+    <div class="klog" id="klog-${m.id}"></div>
+  </div>`).join("");
+
+const url = id => MACHINES.find(m => m.id === id).url;
+function screen(id, html) {   // same text on the panel screen and on the 3D machine's screen
+  document.getElementById("screen-" + id).innerHTML = html;
+  world()?.setScreen(id, html.replace(/<[^>]+>/g, "").replace(/&gt;/g, ">"));
+}
+function drawGlass(id, stock) {
+  document.getElementById("glass-" + id).innerHTML = Object.entries(stock).map(([name, q], i) => `
+    <div class="slot ${q <= 2 ? "low" : ""} ${q === 0 ? "empty" : ""}" id="slot-${id}-${name}">
+      <div class="box" style="background:${COLORS[i]}"></div>${name}<div class="q">${q}</div></div>`).join("");
+}
+
+/* ---------------- one customer at a machine ---------------- */
+async function serveCustomer(id, text) {
+  if (busy[id] || !text) return;
+  busy[id] = true;
+  const no = ++served, age = rand(15, 70);
+  document.getElementById("served").textContent = `${served} customers served`;
+  screen(id, `Customer #${no} (age ${age}) is coming...`);
+  await (world() ? world().arrive(id) : sleep(600));
+
+  // the customer types on the screen
+  let typed = "";
+  for (const ch of text) {
+    typed += ch;
+    screen(id, `Customer #${no}, age ${age}\nWhat do you feel?\n<span class="you">&gt; ${typed}_</span>`);
+    await sleep(45);
+  }
+  await sleep(300);
+  try {
+    const r = await call(url(id) + "/consult", "POST", { text, age });
+    if (r.action === "RECOMMEND") {
+      screen(id, `<span class="you">&gt; ${text}</span>\nSymptoms: ${r.symptoms.join(", ")}\nRecommended: ${r.medicine}\nPrice: PHP ${r.price}  [paying...]`);
+      await sleep(1200);
+      document.getElementById(`slot-${id}-${r.medicine}`)?.classList.add("vend");
+      try {
+        await call(url(id) + "/buy", "POST", { medicine: r.medicine });
+        world()?.dispense(id, COLORS[r.slot - 1]);
+        screen(id, `<span class="you">&gt; ${text}</span>\n${r.medicine} dispensed.\nThank you!`);
+      } catch (e) {
+        screen(id, `<span class="you">&gt; ${text}</span>\nSorry, ${e.message}.`);
+      }
+    } else {
+      screen(id, `<span class="you">&gt; ${text}</span>\n${r.message}`);
+    }
+  } catch (e) {
+    screen(id, "Machine not responding.");
+  }
+  await sleep(1800);
+  document.querySelectorAll(`#glass-${id} .vend`).forEach(s => s.classList.remove("vend"));
+  screen(id, "Touch the screen to start.");
+  await (world() ? world().leave(id) : sleep(300));
+
+  // staff refills a medicine that ran out
+  if (running && state[id] && Object.values(state[id].stock).some(q => q === 0)) {
+    screen(id, "Staff is restocking...");
+    await sleep(1500);
+    await restock(id);
+    screen(id, "Touch the screen to start.");
+  }
+  busy[id] = false;
+}
+
+/* ---------------- automatic simulation ---------------- */
+async function machineLoop(id) {
+  while (running) {
+    await sleep(rand(1000, 5000));       // random time until the next customer arrives
+    if (running) await serveCustomer(id, PHRASES[rand(0, PHRASES.length)]);
+  }
+}
+function toggleSimulation() {
+  running = !running;
+  const b = document.getElementById("startBtn");
+  b.textContent = running ? "■ Stop simulation" : "▶ Start simulation";
+  b.className = running ? "running" : "";
+  if (running) MACHINES.forEach(m => machineLoop(m.id));   // all 3 machines run in parallel
+}
+
+/* ---------------- buttons ---------------- */
+async function toggleNet(id) { await call(url(id) + "/network", "POST", { on: !state[id].online }); }
+async function restock(id) { await call(url(id) + "/restock", "POST"); }
+const msg = t => document.getElementById("cloudMsg").textContent = t;
+async function admin(path) { try { msg(JSON.stringify(await call(path, "POST"))); } catch (e) { msg(e.message); } }
+async function toggleCloudDown() { cloudDown = (await call("/sim/cloud-down", "POST", { on: !cloudDown })).cloud_down; }
+async function toggleSyncFails() { syncFails = (await call("/sim/sync-fails", "POST", { on: !syncFails })).sync_fails; }
+async function checkRecords() {
+  try {
+    const r = await call("/api/check");
+    msg(r.map(x => `${x.machine_id}: machine ${x.machine_has}, cloud ${x.cloud_has}, missing ${x.missing}, duplicates ignored ${x.duplicates_ignored}`).join("  |  "));
+  } catch (e) { msg(e.message); }
+}
+async function api(method, path, body) {
+  const out = document.getElementById("apiOut");
+  out.textContent = `${method} ${path} ...`;
+  try { out.textContent = `${method} ${path}\n` + JSON.stringify(await call(path, method, body), null, 2); }
+  catch (e) { out.textContent = `${method} ${path}\nHTTP ${e.status}: ${e.message}`; }
+}
+async function computeParallel() {
+  const out = document.getElementById("apiOut"), t0 = performance.now();
+  const r = await Promise.all(MACHINES.map((m, i) =>
+    call(`${m.url}/compute-parallel?data_item=${i + 2}`, "POST").catch(e => ({ node_id: m.id, error: e.message }))));
+  out.textContent = `POST /compute-parallel on all 3 machines at once (${Math.round(performance.now() - t0)} ms total, each takes ~150 ms)\n` + JSON.stringify(r, null, 2);
+}
+
+/* ---------------- refresh from the servers ---------------- */
+async function refresh() {
+  try { const s = await call("/sim/status"); cloudDown = s.cloud_down; syncFails = s.sync_fails; } catch (e) {}
+  document.getElementById("downBtn").className = cloudDown ? "on" : "";
+  document.getElementById("downBtn").textContent = cloudDown ? "Cloud down: ON" : "Cloud down";
+  document.getElementById("failBtn").className = syncFails ? "on" : "";
+  document.getElementById("failBtn").textContent = syncFails ? "Sync failure: ON" : "Sync failure";
+
+  await Promise.all(MACHINES.map(async m => {
+    try { state[m.id] = await call(m.url + "/state"); } catch (e) { state[m.id] = null; }
+    const s = state[m.id];
+    if (!s) { document.getElementById("net-" + m.id).textContent = "not running"; return; }
+    document.getElementById("led-" + m.id).className = "led" + (s.online ? "" : " off");
+    document.getElementById("net-" + m.id).textContent = s.online ? "online" : "offline";
+    document.getElementById("netBtn-" + m.id).textContent = s.online ? "Internet off" : "Internet on";
+    if (!document.querySelector(`#glass-${m.id} .vend`)) drawGlass(m.id, s.stock);
+    document.getElementById("info-" + m.id).textContent = `Queued records: ${s.queued} · Last sync: ${ago(s.last_sync)}`;
+  }));
+  world()?.update(state, cloudDown);
+
+  try {
+    const d = await call("/api/dashboard");
+    document.getElementById("cloudTable").innerHTML =
+      `<tr><th>Machine</th><th>Status</th><th>Last sync</th><th>Data</th><th>Records in cloud</th><th>Sales</th></tr>` +
+      d.machines.map(m => `<tr><td>${m.machine_id}</td>
+        <td><span class="pill ${m.status === "ONLINE" ? "green" : "red"}">${m.status}</span></td>
+        <td>${ago(m.last_sync)}</td>
+        <td class="${m.outdated ? "low" : ""}">${m.outdated ? "may be outdated" : "up to date"}</td>
+        <td>${m.records_in_cloud}</td><td>${m.sales} (PHP ${m.revenue})</td></tr>`).join("");
+    document.getElementById("alerts").innerHTML = d.alerts.length
+      ? d.alerts.map(a => `<div class="alert">${new Date(a.time * 1000).toLocaleTimeString()} · ${a.text}</div>`).join("") : "No alerts.";
+    const bars = rows => { const max = Math.max(1, ...rows.map(r => r[1]));
+      return rows.map(([k, v]) => `<div class="bar"><span>${k}</span><i style="width:${v / max * 120}px"></i>${v}</div>`).join(""); };
+    document.getElementById("analytics").innerHTML = d.top_medicines.length
+      ? `<b>Most sold</b>${bars(d.top_medicines)}<b>Most common symptoms</b>${bars(d.top_symptoms)}` : "No data yet.";
+    const mt = await call("/api/metrics");
+    document.getElementById("metrics").innerHTML =
+      `<table><tr><th>API</th><th>Requests</th><th>Avg</th><th>Max</th><th>Errors</th></tr>` +
+      mt.endpoints.map(e => `<tr><td>${e.endpoint}</td><td>${e.requests}</td><td>${e.avg_ms} ms</td><td>${e.max_ms} ms</td>
+        <td class="${e.errors ? "low" : ""}">${e.errors}</td></tr>`).join("") + `</table>` +
+      `<p style="margin:8px 0 0"><b>Sync delay</b> (time from sale to cloud): ` +
+      Object.entries(mt.sync_delay).map(([k, v]) => `${k} avg ${v.avg_s}s, max ${v.max_s}s`).join(" · ") + `</p>`;
+  } catch (e) {
+    document.getElementById("cloudTable").innerHTML = `<tr><td class="low">Cloud is down. The dashboard cannot load, but the machines keep working.</td></tr>`;
+  }
+  setTimeout(refresh, 1200);
+}
+
+let lastSeen = Date.now() / 1000;
+const esc = t => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+async function refreshLogs() {
+  const lists = await Promise.all([call("/logs"), ...MACHINES.map(m => call(m.url + "/logs"))].map(p => p.catch(() => [])));
+  const all = lists.flat().sort((a, b) => b.ts - a.ts);
+  for (const e of all) if (e.ts > lastSeen && e.message.startsWith("Synced")) world()?.packet(e.node);  // records travel up the line
+  if (all.length) lastSeen = Math.max(lastSeen, all[0].ts);
+
+  // each machine's own log: API calls it sends (->) and receives (<-), plus what it executes
+  MACHINES.forEach((m, i) => {
+    const box = document.getElementById("klog-" + m.id);
+    const atTop = box.scrollTop < 5;
+    box.innerHTML = lists[i + 1].slice().reverse().slice(0, 120).map(e => {
+      const cls = e.level === "WARN" ? "WARN" : e.kind !== "api" ? "ev" : e.message.startsWith("->") ? "out" : "in";
+      return `<div class="${cls}">${e.time} ${esc(e.message)}</div>`;
+    }).join("");
+    if (atTop) box.scrollTop = 0;
+  });
+
+  // shared event log: what happened, without the API call lines
+  document.getElementById("logs").innerHTML = all.filter(e => e.kind !== "api").slice(0, 200).map(e =>
+    `<div class="${e.level}">${e.time} [${e.node}] [trace ${e.trace_id}] ${esc(e.message)}</div>`).join("");
+  setTimeout(refreshLogs, 1200);
+}
+
+/* ---------------- concept buttons: highlight where it happens + short explanation ---------------- */
+const CONCEPTS = {
+  star: { title: "Star topology", where: ["#worldBox"], world: "lines",
+    text: "Every MENDO machine connects only to the cloud in the center, and the machines never talk to each other. Green line: connected. Red: that machine's internet is off. Grey: the cloud is down. A green ball is a batch of records being sent up." },
+  cap: { title: "CAP theorem: we chose availability", where: [".machines", "#cloudTable"], world: "machines",
+    text: "When the network breaks, a system has to choose between consistency and availability. We chose availability: a machine keeps recommending and selling without internet. The cost is that the cloud can be behind for a while, so the dashboard shows 'Last sync' and 'may be outdated'. Safety and stock checks stay on the machine, so they always work." },
+  replication: { title: "Replication, not sharding", where: [".klog", "#cloudTable"], world: "lines",
+    text: "Every record is saved on its machine first, then a copy is sent to the cloud (the '-> POST cloud/api/sync' lines in each machine's log). Each record has a unique ID, so if it arrives twice the cloud keeps one copy. The scaffold's write/read is sharding instead: a key is stored on only one machine." },
+  deployment: { title: "Hybrid deployment with a private cloud", where: [".machines", "#cloudTable"], world: "cloud",
+    text: "Each machine keeps its own POS, stock and records locally (on-site). The shared services run in our private cloud: the dashboard, the central database, monitoring, analytics and backups. Machines must use their own API key, and the dashboard needs the admin key." },
+  observability: { title: "Observability", where: ["#metrics", "#alerts", "#logs", ".klog"], world: "cloud",
+    text: "Logs: each machine's API calls and the shared event log, all with trace IDs. Metrics: API response time, errors and sync delay. Health checks: heartbeats every 3 s and GET /cluster/health. Alerts: machine offline, medicine low." },
+  resilience: { title: "Resilience tests", where: ["#faultRow", ".under"], world: "lines",
+    text: "We test recovery with these buttons: 'Internet off' on a machine, 'Cloud down', and 'Sync failure'. Records stay saved on the machine and are sent when it reconnects. 'Check records' then shows nothing missing and no duplicates. 'Backup' and 'Restore backup' test recovering the central database." },
+  parallelism: { title: "Parallelism", where: [".machines", "#worldBox"], world: "machines",
+    text: "The 3 machines serve customers at the same time, each in its own program. The cloud receives their records, watches heartbeats and computes analytics concurrently. Safety: a lock on each machine's stock means two customers can't get the same last box, and the unique record IDs keep sync safe." },
+};
+const bubble = document.getElementById("bubble");
+document.addEventListener("click", e => {
+  const btn = e.target.closest("[data-concept]");
+  if (!btn) { bubble.style.display = "none"; return; }
+  const c = CONCEPTS[btn.dataset.concept];
+  bubble.innerHTML = `<b>${c.title}</b>${c.text}`;
+  bubble.style.display = "block";
+  const r = btn.getBoundingClientRect();
+  bubble.style.left = Math.min(r.left, innerWidth - 340) + "px";
+  bubble.style.top = r.bottom + 8 + "px";
+  document.querySelectorAll(".hl").forEach(x => x.classList.remove("hl"));
+  for (const sel of c.where) document.querySelectorAll(sel).forEach(el => {
+    el.classList.add("hl"); setTimeout(() => el.classList.remove("hl"), 3500);
+  });
+  if (c.world) world()?.highlight(c.world);
+});
+window.addEventListener("scroll", () => bubble.style.display = "none");
+
+refresh();
+refreshLogs();
+</script>
+</body>
+</html>
